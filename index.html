@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Card Deal Checker · undervalued trading cards</title>
+    <meta name="description" content="Check a trading card's asking price against recent sold and market prices, in AUD. Read-only: no buying or bidding." />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#0b0c0a" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/app.css?v=1" />
+  </head>
+  <body>
+    <div class="glow glow-a" aria-hidden="true"></div>
+    <div class="glow glow-b" aria-hidden="true"></div>
+    <div class="shell">
+      <header class="top">
+        <div class="brand">
+          <span class="mark" aria-hidden="true"></span>
+          <div>
+            <p class="eyebrow">Read-only · prices in AUD</p>
+            <h1>Card Deal Checker</h1>
+          </div>
+        </div>
+        <button class="btn" type="button" id="open-settings" aria-label="Settings">⚙ Settings</button>
+      </header>
+
+      <nav class="tabs" aria-label="Sections" role="tablist">
+        <button class="tab" type="button" role="tab" data-view="check" aria-selected="true">Check</button>
+        <button class="tab" type="button" role="tab" data-view="comps" aria-selected="false">Comps</button>
+        <button class="tab" type="button" role="tab" data-view="grading" aria-selected="false">Grading</button>
+        <button class="tab" type="button" role="tab" data-view="watch" aria-selected="false">Watchlist <span class="count" id="watch-count"></span></button>
+        <button class="tab" type="button" role="tab" data-view="tips" aria-selected="false">Tips</button>
+      </nav>
+
+      <main>
+        <!-- ============================== CHECK -->
+        <section class="view" id="view-check" data-view-panel="check">
+          <div class="panel">
+            <div class="panel-head"><h2>Find the card</h2><p>Pokémon, Magic and Yu-Gi-Oh! have free live prices. Sports and anything else: use sold comps.</p></div>
+            <label class="field">
+              <span>Paste a listing title or link (optional)</span>
+              <textarea id="paste" rows="2" placeholder="e.g. Pokemon Charizard Base Set 4/102 Holo Rare"></textarea>
+            </label>
+            <div class="row-actions"><button class="btn" type="button" id="read-listing">Read listing</button></div>
+            <div id="listing-read" class="listing-read" hidden></div>
+
+            <div class="seg" role="radiogroup" aria-label="Card type" id="game-seg">
+              <button type="button" role="radio" data-game="pokemon" aria-checked="true">Pokémon</button>
+              <button type="button" role="radio" data-game="mtg" aria-checked="false">Magic</button>
+              <button type="button" role="radio" data-game="ygo" aria-checked="false">Yu-Gi-Oh!</button>
+              <button type="button" role="radio" data-game="sports" aria-checked="false">Sports &amp; other</button>
+            </div>
+
+            <form id="search-form" class="grid2" autocomplete="off">
+              <label class="field"><span>Card name</span><input id="q-name" type="text" placeholder="Charizard" required /></label>
+              <label class="field"><span>Number / set code (optional)</span><input id="q-number" type="text" placeholder="4/102 or LOB-005" /></label>
+              <div class="row-actions span2"><button class="btn primary" type="submit" id="search-btn">Search prices</button></div>
+            </form>
+
+            <div id="sports-box" class="note-box" hidden>
+              <p><b>No free sold-price feed covers sports cards</b> (eBay, 130point and PSA all block apps like this). Open a sold search below, copy 3 or more recent sold prices for the same card and grade, then tap <b>Use comps</b>.</p>
+              <div class="links" id="sports-links"></div>
+              <div class="row-actions"><button class="btn primary" type="button" id="sports-to-comps">Use comps</button></div>
+            </div>
+
+            <p class="status" id="search-status" role="status"></p>
+            <ul class="results" id="results"></ul>
+          </div>
+
+          <div class="panel" id="card-panel" hidden>
+            <div class="card-head">
+              <img id="card-img" alt="" hidden />
+              <div>
+                <h2 id="card-name"></h2>
+                <p class="muted" id="card-meta"></p>
+                <div class="links" id="card-links"></div>
+              </div>
+            </div>
+            <p class="status" id="card-status" role="status"></p>
+            <div id="price-wrap">
+              <p class="hint">Tap a row to use it as the market price. <span class="badge sold">sold</span> = based on completed sales, <span class="badge listing">listing</span> = asking prices. Prices are for raw near-mint copies.</p>
+              <table class="prices" id="prices"><thead><tr><th></th><th>Source</th><th>Price</th><th>AUD</th></tr></thead><tbody></tbody></table>
+            </div>
+            <div class="links" id="card-sold-links"></div>
+          </div>
+
+          <div class="panel" id="ask-panel" hidden>
+            <div class="panel-head"><h2>The listing</h2></div>
+            <form id="ask-form" class="grid2" autocomplete="off">
+              <label class="field"><span>Asking price (A$)</span><input id="ask" type="number" inputmode="decimal" min="0" step="0.01" required /></label>
+              <label class="field"><span>Shipping (A$)</span><input id="ship" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" /></label>
+              <label class="field span2"><span>Condition</span>
+                <select id="cond">
+                  <option value="nm">Near mint (raw)</option>
+                  <option value="lp">Lightly played (×0.85)</option>
+                  <option value="mp">Moderately played (×0.70)</option>
+                  <option value="hp">Heavily played / damaged (×0.50)</option>
+                  <option value="graded">Graded slab (needs comps)</option>
+                </select>
+              </label>
+              <div class="row-actions span2"><button class="btn primary" type="submit" id="check-btn">Check deal</button></div>
+            </form>
+            <div id="verdict-check"></div>
+          </div>
+        </section>
+
+        <!-- ============================== COMPS -->
+        <section class="view" id="view-comps" data-view-panel="comps" hidden>
+          <div class="panel">
+            <div class="panel-head"><h2>Sold comps</h2><p>Works for any card, including sports, graded slabs and rare gems. Use recent sold prices (last 30–90 days) for the same card, grade and condition.</p></div>
+            <form id="comps-form" class="grid2" autocomplete="off">
+              <label class="field span2"><span>Card</span><input id="c-name" type="text" placeholder="2021 Prizm LaMelo Ball #278 PSA 10" /></label>
+              <div class="links span2" id="comps-links"></div>
+              <label class="field span2"><span>Sold prices (one per line, or separated by commas)</span><textarea id="c-prices" rows="4" placeholder="120&#10;135.50&#10;99, 110"></textarea></label>
+              <label class="field"><span>Those prices are in</span>
+                <select id="c-cur"><option value="AUD">AUD</option><option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option></select>
+              </label>
+              <p class="hint span2" id="c-parsed">0 prices</p>
+              <label class="field"><span>Asking price (A$)</span><input id="c-ask" type="number" inputmode="decimal" min="0" step="0.01" required /></label>
+              <label class="field"><span>Shipping (A$)</span><input id="c-ship" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" /></label>
+              <div class="row-actions span2"><button class="btn primary" type="submit" id="comps-btn">Check against comps</button></div>
+            </form>
+            <div id="comps-stats"></div>
+            <div id="verdict-comps"></div>
+          </div>
+        </section>
+
+        <!-- ============================== GRADING -->
+        <section class="view" id="view-grading" data-view-panel="grading" hidden>
+          <div class="panel">
+            <div class="panel-head"><h2>Grading upside</h2><p>Is it worth buying raw and grading? Free sources don't publish graded prices, so enter PSA 10 and PSA 9 sold prices from 130point or eBay sold.</p></div>
+            <form id="grade-form" class="grid2" autocomplete="off">
+              <label class="field span2"><span>Card</span><input id="g-name" type="text" placeholder="Card name" /></label>
+              <div class="links span2" id="grade-links"></div>
+              <label class="field"><span>Raw buy cost (A$)</span><input id="g-cost" type="number" inputmode="decimal" min="0" step="0.01" required /></label>
+              <label class="field"><span>PSA 8 or lower is worth (A$)</span><input id="g-low" type="number" inputmode="decimal" min="0" step="0.01" placeholder="raw value" /></label>
+              <label class="field"><span>PSA 10 sold (A$)</span><input id="g-10" type="number" inputmode="decimal" min="0" step="0.01" /></label>
+              <label class="field"><span>PSA 9 sold (A$)</span><input id="g-9" type="number" inputmode="decimal" min="0" step="0.01" /></label>
+              <label class="field"><span>Chance of PSA 10 (%)</span><input id="g-p10" type="number" inputmode="decimal" min="0" max="100" step="1" value="20" /></label>
+              <label class="field"><span>Chance of PSA 9 (%)</span><input id="g-p9" type="number" inputmode="decimal" min="0" max="100" step="1" value="45" /></label>
+              <p class="hint span2" id="g-costs"></p>
+              <div class="row-actions span2"><button class="btn primary" type="submit" id="grade-btn">Work out EV</button></div>
+            </form>
+            <div id="grade-out"></div>
+          </div>
+        </section>
+
+        <!-- ============================== WATCHLIST -->
+        <section class="view" id="view-watch" data-view-panel="watch" hidden>
+          <div class="panel">
+            <div class="panel-head"><h2>Watchlist</h2><p>Cards you want, with the most you'd pay. Saved only on this phone.</p></div>
+            <ul class="watch" id="watch-list"></ul>
+            <p class="status" id="watch-status" role="status"></p>
+            <details class="add-watch">
+              <summary>Add a card by hand</summary>
+              <form id="watch-form" class="grid2" autocomplete="off">
+                <label class="field span2"><span>Card</span><input id="w-name" type="text" required placeholder="2019 Select Nathan Cleary Rookie" /></label>
+                <label class="field"><span>Type</span><select id="w-game"><option value="sports">Sports</option><option value="pokemon">Pokémon</option><option value="mtg">Magic</option><option value="ygo">Yu-Gi-Oh!</option><option value="other">Other</option></select></label>
+                <label class="field"><span>Target buy price (A$)</span><input id="w-target" type="number" inputmode="decimal" min="0" step="0.01" /></label>
+                <label class="field span2"><span>Notes</span><input id="w-notes" type="text" placeholder="Grade, variant, where you saw it" /></label>
+                <div class="row-actions span2"><button class="btn primary" type="submit">Add to watchlist</button></div>
+              </form>
+            </details>
+            <div class="row-actions">
+              <button class="btn" type="button" id="watch-refresh">Refresh prices</button>
+              <button class="btn" type="button" id="watch-export">Export JSON</button>
+              <label class="btn file-btn">Import JSON<input type="file" id="watch-import" accept="application/json,.json" hidden /></label>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================== TIPS -->
+        <section class="view" id="view-tips" data-view-panel="tips" hidden>
+          <div class="panel tips">
+            <div class="panel-head"><h2>Spotting undervalued listings</h2><p>General guidance, not financial advice. Always check sold prices for the exact card before you buy.</p></div>
+            <h3>Where the bargains hide</h3>
+            <ul>
+              <li><b>Misspelt titles.</b> “Charzard”, “Lebron Jame”, “Pokeman”. Fewer people find them, so fewer bids.</li>
+              <li><b>Bad photos.</b> Dark, blurry or sleeved-in-a-toploader shots put buyers off. Ask for clear front/back photos before buying.</li>
+              <li><b>Lots and bundles.</b> Sellers often price by the stack. One key card can be worth more than the whole lot.</li>
+              <li><b>Odd ending times.</b> Auctions ending at 3–5am AEST, midweek, or on public holidays get fewer last-minute bids.</li>
+              <li><b>Vague titles.</b> No set, number or year (“old pokemon card holo”) means the seller may not know what they have.</li>
+              <li><b>Wrong category.</b> Cards listed under toys, collectables or the wrong sport get less traffic.</li>
+              <li><b>Best Offer.</b> Fixed-price listings with Best Offer often take 10–20% less. Offers are only a starting point, and buying is up to you.</li>
+            </ul>
+            <h3>Rare gems</h3>
+            <ul>
+              <li><b>Low population graded cards.</b> Check the PSA/BGS/CGC pop report: a PSA 10 with a tiny population sells for a big premium.</li>
+              <li><b>Errors and misprints.</b> Some (wrong backs, missing stamps, famous print errors) are valuable; most miscuts aren't. Price the exact error.</li>
+              <li><b>Short prints and numbered cards.</b> /99, /25, /10 and 1/1 parallels: the lower the print run, the higher the price. Check it's the real parallel.</li>
+              <li><b>1st Edition, shadowless and promos.</b> Small marks matter a lot in vintage Pokémon. Compare the symbol and border to a reference image.</li>
+            </ul>
+            <h3>Red flags</h3>
+            <ul>
+              <li>Price far below every sold comp with stock photos: could be fake, a reprint, or a scam.</li>
+              <li>Words like “RP”, “reprint”, “proxy”, “custom”, “orica”, “replica” mean it isn't an original.</li>
+              <li>New seller, no feedback, pushing to pay outside the platform: walk away.</li>
+              <li>Slab looks tampered with or the cert number doesn't match the card: check the cert on the grader's website.</li>
+            </ul>
+            <h3>How the deal score works</h3>
+            <ul>
+              <li><b>Discount (0–60):</b> −20% or worse scores 0, 50% under market or better scores 60, linear in between.</li>
+              <li><b>Data depth (0–25):</b> comps: 3–5 = 10, 6–9 = 18, 10+ = 25. Live prices: sales-based and confirmed by a second source = 18, one sales-based source = 12, asking prices only or sources disagree = 6.</li>
+              <li><b>Consistency (0–15):</b> comps spread under 15% = 15, under 30% = 9, wider = 3. Live prices = 8.</li>
+              <li>Verdict: 30%+ under = Strong deal, 15–30% = Good deal, 5–15% = Slightly under, ±5% = About market, 5–20% over = Above market, more = Overpriced. Your cost includes shipping.</li>
+            </ul>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <p id="fx-line" class="muted">Loading exchange rates…</p>
+        <p class="muted">Prices: TCGplayer and Cardmarket via TCGdex, pokemontcg.io, Scryfall and YGOPRODeck. FX: Frankfurter (ECB). Read-only: this app never buys, bids or signs in anywhere.</p>
+      </footer>
+    </div>
+
+    <dialog id="settings">
+      <form method="dialog" id="settings-form">
+        <h2>Settings</h2>
+        <p class="hint">Grading costs change often. Check the grader's current fees and set yours here (A$).</p>
+        <label class="field"><span>Grading fee per card (A$)</span><input id="s-fee" type="number" inputmode="decimal" min="0" step="0.01" /></label>
+        <label class="field"><span>Shipping &amp; insurance, both ways (A$)</span><input id="s-ship" type="number" inputmode="decimal" min="0" step="0.01" /></label>
+        <label class="field"><span>Selling fees when you sell (%)</span><input id="s-sell" type="number" inputmode="decimal" min="0" max="60" step="0.1" /></label>
+        <p class="hint">Backup exchange rates, used only if the live rate can't load (A$ per 1 unit).</p>
+        <div class="grid2">
+          <label class="field"><span>USD → AUD</span><input id="s-usd" type="number" inputmode="decimal" min="0" step="0.0001" placeholder="auto" /></label>
+          <label class="field"><span>EUR → AUD</span><input id="s-eur" type="number" inputmode="decimal" min="0" step="0.0001" placeholder="auto" /></label>
+        </div>
+        <div class="row-actions">
+          <button class="btn" value="cancel" type="submit">Cancel</button>
+          <button class="btn primary" value="save" type="submit" id="settings-save">Save settings</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="js/app.js?v=1"></script>
+  </body>
+</html>

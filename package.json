@@ -1,0 +1,13 @@
+{
+  "name": "card-deals",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Card Deal Checker: check a trading card's asking price against recent sold and market prices, in AUD.",
+  "scripts": {
+    "start": "node tests/server.mjs",
+    "test": "node tools/check-encoding.mjs && node tests/unit.mjs && node tests/e2e.mjs",
+    "test:live": "node tests/live-smoke.mjs",
+    "icons": "node tools/make-icons.mjs"
+  }
+}
