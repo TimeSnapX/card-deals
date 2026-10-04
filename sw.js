@@ -9,7 +9,7 @@
  * - Never touches localStorage (your watchlist lives there).
  * Bump VERSION to drop old caches.
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const PREFIX = "card-deals-";
 const CACHE = `${PREFIX}${VERSION}`;
 const SCOPE = new URL(self.registration.scope);

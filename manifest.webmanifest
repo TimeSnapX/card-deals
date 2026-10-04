@@ -1,5 +1,5 @@
 {
-  "id": "/card-deals/",
+  "id": "/card-deals/?app=card-deals",
   "name": "Card Deal Checker",
   "short_name": "Card Deals",
   "description": "Check a trading card's asking price against recent sold and market prices, in AUD.",

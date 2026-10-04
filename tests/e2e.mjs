@@ -396,7 +396,7 @@ await step("PWA: installable, SW scoped to /card-deals/, caches only app files, 
   const man = await cdp.send("Page.getAppManifest");
   assert.deepEqual(man.errors, []);
   const appId = await cdp.send("Page.getAppId");
-  assert.equal(appId.appId, `http://127.0.0.1:${PORT}/card-deals/`);
+  assert.equal(appId.appId, `http://127.0.0.1:${PORT}/card-deals/?app=card-deals`);
   const cached = await p.evaluate(async () => { const out = []; for (const k of await caches.keys()) for (const r of await (await caches.open(k)).keys()) out.push(r.url); return out; });
   assert.ok(cached.length >= 8, "shell cached");
   assert.ok(cached.every((u) => u.startsWith(BASE)), "only app files cached: " + cached.filter((u) => !u.startsWith(BASE)).join(","));
