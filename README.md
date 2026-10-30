@@ -24,6 +24,23 @@ Not used: eBay sold listings (blocked, and robots/ToS forbid automated access),
 130point and PSA pop report (Cloudflare bot protection), PriceCharting API (paid token),
 TCGCSV (no CORS, so not callable from a static page).
 
+## Identify from a photo
+
+Check tab → **Snap card photo** (opens the rear camera) or **Upload from gallery**.
+The photo is read on the phone with [Tesseract.js](https://tesseract.projectnaptha.com/)
+(loaded from jsDelivr on first use, ~5 MB; no key, the image is never uploaded). It is
+greyscaled, contrast-stretched and resized, with optional rotate and crop (top / bottom /
+middle third). The text is parsed for name, `123/198`-style number, Yu-Gi-Oh! set code,
+Magic set code, and slab grader / grade / qualifier / cert number. Candidates come from the
+same keyless catalogs: TCGdex by card number + set size (Pokémon), Scryfall fuzzy name +
+set code (Magic), YGOPRODeck (Yu-Gi-Oh!). You confirm or edit the fields; **prices are
+only fetched after Confirm**, through the normal price lookup. Graded slabs still need comps.
+
+Limits: plain OCR reads normal cards well but struggles with full-art / illustration
+rares, foil glare, blur and small slab labels. Reliable art-based identification would
+need a vision API (e.g. a hosted image-recognition key), which this app deliberately
+does not use.
+
 ## Maths
 
 - Cost = asking price + shipping. Discount = (reference − cost) / reference.
@@ -41,6 +58,7 @@ TCGCSV (no CORS, so not callable from a static page).
 ```bash
 node tests/server.mjs            # http://127.0.0.1:4741/card-deals/
 node tests/unit.mjs              # maths, parser, watchlist
+node tests/photo-unit.mjs        # photo text parser
 node tests/e2e.mjs               # headless Chrome, phone viewport, mocked APIs, PWA checks
 node tests/live-smoke.mjs [url]  # real APIs
 ```

@@ -1,6 +1,7 @@
 // Card Deal Checker: UI. Read-only; all prices fetched from keyless public APIs.
-import * as C from "./core.js?v=1";
-import * as S from "./sources.js?v=1";
+import * as C from "./core.js?v=2";
+import * as S from "./sources.js?v=2";
+import * as P from "./photo.js?v=2";
 
 // Register the service worker first, independent of any data loading.
 if ("serviceWorker" in navigator) {
@@ -599,3 +600,120 @@ renderAllLinks();
 renderParsed();
 loadFx();
 window.__cdc = { core: C, get state() { return { current, watch, settings, fx }; } };
+
+// ------------------------------------------------------------------ identify from a photo
+const photo = { file: null, rotate: 0, parsed: null, text: "", candidates: [], pick: -1, busy: false };
+const CROPS = { full: null, top: { x: 0, y: 0, w: 1, h: 0.36 }, bottom: { x: 0, y: 0.64, w: 1, h: 0.36 }, middle: { x: 0.1, y: 0.25, w: 0.8, h: 0.75 } };
+
+for (const id of ["#photo-camera", "#photo-gallery"]) {
+  $(id).addEventListener("change", (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    photo.file = f;
+    photo.rotate = 0;
+    $("#photo-crop").value = "full";
+    readPhoto();
+  });
+}
+$("#photo-rotate").addEventListener("click", () => { photo.rotate = (photo.rotate + 90) % 360; readPhoto(); });
+$("#photo-reread").addEventListener("click", () => readPhoto());
+$("#photo-crop").addEventListener("change", () => readPhoto());
+
+async function readPhoto() {
+  if (!photo.file || photo.busy) return;
+  photo.busy = true;
+  const st = $("#photo-status");
+  st.className = "status";
+  $("#photo-work").hidden = false;
+  $("#photo-form").hidden = true;
+  try {
+    st.textContent = "Preparing photo…";
+    const canvas = await P.preprocess(photo.file, { rotate: photo.rotate, crop: CROPS[$("#photo-crop").value] });
+    const view = $("#photo-canvas");
+    view.width = canvas.width; view.height = canvas.height;
+    view.getContext("2d").drawImage(canvas, 0, 0);
+    st.textContent = "Reading text (first time downloads the reader, ~5 MB)…";
+    const text = await P.ocr(canvas, (m) => {
+      if (m.status === "recognizing text") st.textContent = `Reading text… ${Math.round((m.progress || 0) * 100)}%`;
+    });
+    photo.text = text;
+    photo.parsed = P.parseOcr(text);
+    st.textContent = "Looking up matching cards…";
+    const game = photo.parsed.game || (["pokemon", "mtg", "ygo"].includes(current.game) ? current.game : "pokemon");
+    const { candidates, errors } = game === "sports" ? { candidates: [], errors: [] } : await P.findCandidates(S, photo.parsed, text, game);
+    photo.candidates = candidates;
+    photo.pick = candidates.length && candidates[0].score >= 0.6 ? 0 : -1;
+    fillPhotoForm(game);
+    st.textContent = candidates.length ? "" : game === "sports" ? "Sports card: no free price feed, so Confirm opens sold comps." : `No catalog match found${errors.length ? ` (${errors[0]})` : ""}. Fix the name and tap Confirm.`;
+  } catch (err) {
+    st.className = "status error";
+    st.textContent = `${err.message || err}. You can still type the card in below.`;
+  } finally {
+    photo.busy = false;
+  }
+}
+
+function fillPhotoForm(game) {
+  const p = photo.parsed;
+  const top = photo.pick >= 0 ? photo.candidates[photo.pick].card : null;
+  $("#pf-game").value = game;
+  $("#pf-name").value = top ? top.name : (game === "sports" ? (p.nameLines.filter((l) => l.includes(" ")).length ? p.nameLines.filter((l) => l.includes(" ")) : p.nameLines).slice(0, 2) : p.nameLines.slice(0, 1)).join(" ");
+  $("#pf-set").value = top ? top.set : "";
+  $("#pf-number").value = p.setCode || (p.number ? (p.total ? `${p.number}/${p.total}` : p.number) : top ? top.number : "");
+  $("#pf-grade").value = p.grader || p.grade ? `${[p.grader, p.grade].filter(Boolean).join(" ")}${p.gradeQualifier ? ` (${p.gradeQualifier})` : ""}` : "";
+  $("#pf-cert").value = p.cert || "";
+  $("#pf-raw").textContent = photo.text.trim() || "(no text found)";
+  renderPhotoCands();
+  $("#photo-form").hidden = false;
+}
+
+function renderPhotoCands() {
+  const list = photo.candidates;
+  $("#pf-cands-label").textContent = list.length ? "Possible matches (tap the right one):" : "";
+  $("#pf-cands").innerHTML = list
+    .map(({ card: c, score }, i) => `<li><button type="button" class="result${i === photo.pick ? " on" : ""}" data-i="${i}">
+      ${c.image ? `<img src="${esc(c.image)}" alt="" loading="lazy" width="46" height="64" />` : `<span class="noimg" aria-hidden="true">🂠</span>`}
+      <span><b>${esc(c.name)}</b><small>${esc([c.set, c.number && `#${c.number}`, c.year].filter(Boolean).join(" · "))} · match ${Math.round(Math.min(1, score) * 100)}%</small></span></button></li>`)
+    .join("");
+  for (const b of $$("#pf-cands .result")) b.addEventListener("click", () => {
+    photo.pick = Number(b.dataset.i);
+    const c = photo.candidates[photo.pick].card;
+    $("#pf-name").value = c.name;
+    $("#pf-set").value = c.set || "";
+    if (!$("#pf-number").value) $("#pf-number").value = c.number || "";
+    renderPhotoCands();
+  });
+}
+
+$("#photo-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const game = $("#pf-game").value;
+  const name = $("#pf-name").value.trim();
+  const number = $("#pf-number").value.trim();
+  const grade = $("#pf-grade").value.trim();
+  const picked = photo.pick >= 0 ? photo.candidates[photo.pick].card : null;
+  const label = [name, $("#pf-set").value.trim(), number, grade].filter(Boolean).join(" ");
+  setGame(game);
+  $("#q-name").value = name;
+  $("#q-number").value = number;
+  $("#cond").value = grade ? "graded" : "nm";
+  $("#c-name").value = label;
+  $("#g-name").value = label;
+  renderAllLinks();
+  if (game === "sports" || game === "other") {
+    renderLinks($("#sports-links"), C.soldSearchLinks(label || "card"));
+    $("#sports-box").scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  // Existing price lookup: the picked match if its name still agrees, else a normal search.
+  if (picked && P.norm(picked.name) === P.norm(name)) {
+    current.results = [picked];
+    $("#search-status").className = "status";
+    $("#search-status").textContent = `From your photo${grade ? ` (${grade}: raw prices below; for the slab use Comps)` : ""}.`;
+    renderResults();
+    await selectCard(0);
+  } else {
+    $("#search-form").requestSubmit();
+  }
+});

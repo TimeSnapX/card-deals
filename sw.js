@@ -4,12 +4,14 @@
  * - Only same-origin GET requests inside /card-deals/ are handled. Price APIs
  *   (TCGdex, pokemontcg.io, Scryfall, YGOPRODeck), exchange rates, card images
  *   and fonts are cross-origin, so they are never intercepted or cached.
+ * - The photo text reader (Tesseract.js, its wasm core and language data from
+ *   jsDelivr / tessdata) is cross-origin too, so it is never cached here.
  * - Network first, so online behaviour is unchanged; the cache is only a
  *   fallback when the network fails (offline).
  * - Never touches localStorage (your watchlist lives there).
  * Bump VERSION to drop old caches.
  */
-const VERSION = "v2";
+const VERSION = "v3";
 const PREFIX = "card-deals-";
 const CACHE = `${PREFIX}${VERSION}`;
 const SCOPE = new URL(self.registration.scope);
@@ -23,10 +25,11 @@ const SHELL = [
   "icons/icon-512.png",
   "icons/icon-maskable-512.png",
   "icons/apple-touch-icon.png",
-  "css/app.css?v=1",
-  "js/app.js?v=1",
-  "js/core.js?v=1",
-  "js/sources.js?v=1",
+  "css/app.css?v=2",
+  "js/app.js?v=2",
+  "js/core.js?v=2",
+  "js/sources.js?v=2",
+  "js/photo.js?v=2",
 ];
 
 function handled(request) {

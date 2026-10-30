@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/app.css?v=1" />
+    <link rel="stylesheet" href="css/app.css?v=2" />
   </head>
   <body>
     <div class="glow glow-a" aria-hidden="true"></div>
@@ -42,6 +42,40 @@
         <section class="view" id="view-check" data-view-panel="check">
           <div class="panel">
             <div class="panel-head"><h2>Find the card</h2><p>Pokémon, Magic and Yu-Gi-Oh! have free live prices. Sports and anything else: use sold comps.</p></div>
+            <div class="photo-box" id="photo-box">
+              <p class="photo-title"><b>Identify from a photo</b> <small class="muted">Read on your phone; the photo is never uploaded.</small></p>
+              <div class="row-actions">
+                <label class="btn primary file-btn">📷 Snap card photo<input type="file" id="photo-camera" accept="image/*" capture="environment" hidden /></label>
+                <label class="btn file-btn">🖼 Upload from gallery<input type="file" id="photo-gallery" accept="image/*" hidden /></label>
+              </div>
+              <div id="photo-work" hidden>
+                <div class="photo-preview"><canvas id="photo-canvas" aria-label="Photo being read"></canvas></div>
+                <div class="row-actions photo-tools">
+                  <button class="btn" type="button" id="photo-rotate">↻ Rotate</button>
+                  <label class="field inline"><span>Read</span><select id="photo-crop">
+                    <option value="full">Whole photo</option>
+                    <option value="top">Top third (name / slab label)</option>
+                    <option value="bottom">Bottom third (card number)</option>
+                    <option value="middle">Middle (card in slab)</option>
+                  </select></label>
+                  <button class="btn" type="button" id="photo-reread">Read again</button>
+                </div>
+                <p class="status" id="photo-status" role="status"></p>
+                <form id="photo-form" class="grid2" autocomplete="off" hidden>
+                  <p class="hint span2">Check what was read and fix anything wrong. Nothing is priced until you tap Confirm.</p>
+                  <label class="field"><span>Card type</span><select id="pf-game"><option value="pokemon">Pokémon</option><option value="mtg">Magic</option><option value="ygo">Yu-Gi-Oh!</option><option value="sports">Sports &amp; other</option></select></label>
+                  <label class="field"><span>Card name</span><input id="pf-name" type="text" /></label>
+                  <label class="field"><span>Set</span><input id="pf-set" type="text" /></label>
+                  <label class="field"><span>Number / set code</span><input id="pf-number" type="text" placeholder="4/102 or LOB-005" /></label>
+                  <label class="field"><span>Grade (if slabbed)</span><input id="pf-grade" type="text" placeholder="PSA 10" /></label>
+                  <label class="field"><span>Cert number</span><input id="pf-cert" type="text" inputmode="numeric" /></label>
+                  <div class="span2"><p class="hint" id="pf-cands-label"></p><ul class="results" id="pf-cands"></ul></div>
+                  <details class="span2"><summary>Text read from the photo</summary><pre id="pf-raw" class="ocr-raw"></pre></details>
+                  <div class="row-actions span2"><button class="btn primary" type="submit" id="pf-confirm">Confirm &amp; get value</button></div>
+                </form>
+              </div>
+            </div>
+
             <label class="field">
               <span>Paste a listing title or link (optional)</span>
               <textarea id="paste" rows="2" placeholder="e.g. Pokemon Charizard Base Set 4/102 Holo Rare"></textarea>
@@ -238,6 +272,6 @@
       </form>
     </dialog>
 
-    <script type="module" src="js/app.js?v=1"></script>
+    <script type="module" src="js/app.js?v=2"></script>
   </body>
 </html>

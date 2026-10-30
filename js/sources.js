@@ -60,7 +60,17 @@ export async function searchPokemon(name, number) {
   const query = `{ cards(filters: { ${filters.join(", ")} }, pagination: { page: 1, count: 60 }) { id name localId rarity image set { id name releaseDate } } }`;
   const data = await getJSON(ENDPOINTS.tcgdexGraphql, "TCGdex", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query }) });
   const cards = (data && data.data && data.data.cards) || [];
-  let list = cards.map((c) => ({
+  let list = cards.map(mapTcgdexBrief);
+  if (lid) {
+    const strip = (s) => String(s || "").replace(/^0+(?=\d)/, "").toLowerCase();
+    const exact = list.filter((c) => strip(c.number) === lid.toLowerCase());
+    if (exact.length) list = exact;
+  }
+  return list.slice(0, 30);
+}
+
+function mapTcgdexBrief(c) {
+  return {
     id: c.id,
     game: "pokemon",
     name: c.name,
@@ -71,13 +81,34 @@ export async function searchPokemon(name, number) {
     image: c.image ? `${c.image}/low.webp` : "",
     prices: null,
     source: "TCGdex",
-  }));
-  if (lid) {
-    const strip = (s) => String(s || "").replace(/^0+(?=\d)/, "").toLowerCase();
-    const exact = list.filter((c) => strip(c.number) === lid.toLowerCase());
-    if (exact.length) list = exact;
+  };
+}
+
+/** Photo lookup: every Pokémon card printed as localId N in a set whose official count is `total` (when known). */
+export async function pokemonByNumber(localId, total) {
+  const n = String(localId || "").replace(/^0+(?=\d)/, "");
+  if (!n) return [];
+  const ids = [...new Set([n, n.padStart(2, "0"), n.padStart(3, "0")])];
+  const out = [];
+  for (const id of ids) for (let page = 1; page <= 8; page++) {
+    const query = `{ cards(filters: { localId: ${JSON.stringify(id)} }, pagination: { page: ${page}, count: 100 }) { id name localId rarity image set { id name releaseDate cardCount { official total } } } }`;
+    const data = await getJSON(ENDPOINTS.tcgdexGraphql, "TCGdex", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query }) });
+    const cards = (data && data.data && data.data.cards) || [];
+    for (const c of cards) {
+      if (String(c.localId).replace(/^0+(?=\d)/, "") !== n) continue;
+      const cc = (c.set && c.set.cardCount) || {};
+      if (total && Number(cc.official) !== Number(total) && Number(cc.total) !== Number(total)) continue;
+      if (!out.some((x) => x.id === c.id)) out.push(mapTcgdexBrief(c));
+    }
+    if (cards.length < 100) break;
   }
-  return list.slice(0, 30);
+  return out;
+}
+
+/** Photo lookup: Scryfall's own fuzzy name matcher (keyless). Returns the corrected name or null. */
+export async function scryfallFuzzyName(text) {
+  const d = await getJSON(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(text)}`, "Scryfall", { headers: { accept: "application/json" } }, 8000);
+  return d && d.object === "card" ? d.name : null;
 }
 
 function pokemonPricesFromTcgdex(pricing) {
